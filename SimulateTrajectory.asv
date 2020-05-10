@@ -33,6 +33,7 @@ robot = differentialDriveKinematics("TrackWidth", 1, "VehicleInputs", "VehicleSp
 goalRadius = 0.2;
 
 for n = 1 : length(WayPoints)
+    while(currentPos()) 
     [currentPos, Orientation,isAtEnd]=MoveP2PSim(robot, currentPos, Orientation, controller, WayPoints(n),OrgWP,0.1);
     if(isAtEnd==0)
         deltapos=bugaroundRight();
@@ -51,7 +52,6 @@ for n = 1 : length(WayPoints)
 end     
 %%
 
-
 function controller = createController(WayPoints,DLV,MAV, LAD) 
 controller = controllerPurePursuit;
 controller.Waypoints = WayPoints;
@@ -62,6 +62,20 @@ controller.LookaheadDistance = LAD;
 end 
 
 %% Model Trajectory simulation
+
+function bool = Drive(X,Omega)
+
+    vel = X; %meters per second
+    velpub = rospublisher("/mobile_base/commands/velocity");
+    velmsg = rosmessage(velpub);
+
+    velmsg.Linear.X = vel;
+    velmsg.Angular.Z = Omega/2;
+    send(velpub,velmsg);
+    bool = 1;
+
+end
+
 function bool = resetODOM()
 
 
@@ -74,6 +88,23 @@ function bool = resetODOM()
     bool = 1;
 
 end
+
+function pos= getCurrentPos()
+odom = rossubscriber("/odom");
+
+odomdata = receive(odom,3);
+
+pose = odomdata.Pose.Pose;
+
+x = pose.Position.X;
+y = pose.Position.Y;
+quat = pose.Orientation;
+angles = quat2eul([quat.W quat.X quat.Y quat.Z]);
+%theta = rad2deg(angles(1))
+Omega = angles(1);
+pos= [x y Omega];
+end 
+
 
 
 function scandata = get2DScan()
