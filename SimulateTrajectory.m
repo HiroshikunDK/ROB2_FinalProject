@@ -1,10 +1,17 @@
-%% Setup Kobuki Enviorment
+%% Setup Kobuki Enviorment - Laptop
 
 setenv('ROS_MASTER_URI','http://192.168.128.129:11311')
 
 setenv('ROS_IP','192.168.1.71')
 
 rosinit('http://192.168.128.129:11311','NodeHost','192.168.1.71');
+
+%% Setup Kobuki Enviorment - HomeStation: 
+setenv('ROS_MASTER_URI','http://192.168.1.164:11311')
+
+setenv('ROS_IP','192.168.1.92')
+
+rosinit('http://192.168.1.164:11311','NodeHost','192.168.1.92');
 
 %% Get route
 OrgWP = [1.0 1.0; 1.0 4.0;4.0 4.0; 4.0 2.0;6.0 2.0];
@@ -81,9 +88,12 @@ robot1 = differentialDriveKinematics("TrackWidth", 1, "VehicleInputs", "VehicleS
 %% Run Test function
 disp("Test function")
 resetODOM();
-PlotWayPoints(WayPoints)
+PlotWayPoints(OrgWP)
 for n = 1 : length(WayPoints)
     [currentPos, Orientation,isAtEnd]=MoveP2P(robot1, currentPos, Orientation, controller, WayPoints(n),OrgWP,0.1);
+    if(isAtEnd==0)
+        disp("object detected!!!")
+    end
 end
 
 %% run Simulation function 
@@ -127,12 +137,12 @@ end
 %% Model Trajectory simulation
 function bool = resetODOM()
 
-
+    disp("reseODOM called")
     velpub = rospublisher("/mobile_base/commands/reset_odometry");
     msg =rosmessage('std_msgs/Empty');
     send(velpub,msg);
     pause(3);
-    disp("reseODOM called")
+    disp("reseODOM ended")
     
     bool = 1;
 
@@ -361,12 +371,15 @@ while( distanceToGoal > goalRadius )
     %calculate the new robot position.
     robotCurrentPose = [initialPos initOrientation] + getCurrentPos(); 
     
-    if(scanForObstacles()==1)
+    %interrupt settings
+    scandata2 = get2DScan();
+    [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanforObstacles(scandata2)
+    
+    if(isItBlocked==1)
         disp("Interrupt Statement triggered") 
+        isAtEnd=0;
+
         
-        endPos=robotCurrentPose(1,[1 2]);
-        Orientation=robotCurrentPose(1,3);
-        isAtEnd = 0;
         return;
     end 
     
@@ -391,7 +404,7 @@ while( distanceToGoal > goalRadius )
     
     waitfor(vizRate);
 end
-    bool=0;
+    
     endPos = robotCurrentPose(1:2);
     Orientation = robotCurrentPose(3);
     isAtEnd =1;    
