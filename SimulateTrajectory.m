@@ -2,9 +2,9 @@
 
 setenv('ROS_MASTER_URI','http://192.168.128.129:11311')
 
-setenv('ROS_IP','192.168.1.71')
+setenv('ROS_IP','192.168.1.142')
 
-rosinit('http://192.168.128.129:11311','NodeHost','192.168.1.71');
+rosinit('http://192.168.128.129:11311','NodeHost','192.168.1.142');
 
 %% Setup Kobuki Enviorment - HomeStation: 
 setenv('ROS_MASTER_URI','http://192.168.1.164:11311')
@@ -19,59 +19,6 @@ WayPoints = OrgWP;
 currentPos = [0.0 0.0];
 Orientation = 0;
 
-%% Angle to watch 
-%21.83 degres from center 
-%0.9283 radinas from center
-% if these are under 50 cm, then turtlebot wont fit between them.
-%y=asind(2.5);
-
-scandata=get2DScan();
-
-figure
- cart1 = readCartesian(scandata);
-    
-    x = cart1(:,2); % x-pos
-    d = cart1(:,1); % depth
-    
-
-    plot(x,d, '.')
-    ylim([0 3])
-    xlim([-0.7 0.7])
-%%
-   vizRate = rateControl(1/10);
-   something=0;
-   while something==0
-   bool=Drive(1,0);
-   disp("command sent")
-   waitfor(vizRate);
-   end  
-   
-%% 
-    robot = rospublisher('/mobile_base/commands/velocity');
-    velmsg = rosmessage(robot);
-    tic;
-  while toc < 20
-      % Collect information from laser scan
-      scan = get2DScan();
-      %plot(scan);
-      data = readCartesian(scan);
-      x = data(:,1);
-      y = data(:,2);
-      % Compute distance of the closest obstacle
-      dist = sqrt(x.^2 + y.^2);
-      minDist = min(dist);     
-      % Command robot action
-      if minDist < 0.5
-          % If close to obstacle, back up slightly and spin
-          velmsg.Angular.Z = 0.5;
-          velmsg.Linear.X = 1;
-      else
-          % Continue on forward path
-          velmsg.Linear.X = 1;
-          velmsg.Angular.Z = 0;
-      end   
-      send(robot,velmsg);
-  end
 %% Setup
 
 %controller = controllerPurePursuit
@@ -85,14 +32,72 @@ controller = createController(WayPoints,0.2,0.5,0.2);
 
 robot1 = differentialDriveKinematics("TrackWidth", 1, "VehicleInputs", "VehicleSpeedHeadingRate");
 
+
+%% Angle to watch 
+%21.83 degres from center 
+%0.9283 radinas from center
+% if these are under 50 cm, then turtlebot wont fit between them.
+%y=asind(2.5);
+
+scandata=get2DScan();
+
+figure
+ cart1 = readCartesian(scandata);
+    
+    x = cart1(:,2); % x-pos
+    d = cart1(:,1); % depth
+   
+
+    plot(x,d, '.')
+    ylim([0 3])
+    xlim([-0.7 0.7])
+%%
+   
+   vizRate = rateControl(1/10);
+
+   while (1)
+   Drive(1,0);
+   disp("command sent")
+   waitfor(vizRate);
+   %disp(vizRate)
+   end  
+   
+%% Test bugaround 
+
+bugaroundRight();
+   
+   
+   %% Test obstacle
+   
+   vizRate = rateControl(20);
+   startTime = vizRate.TotalElapsedTime;
+   something=0;
+   while something==0
+   %bool=Drive(1,0);
+   %disp("command sent")
+   waitfor(vizRate);
+   if((vizRate.TotalElapsedTime-startTime)>2)
+       startTime = startTime +2;
+       disp("Interrupt started")
+       scandata2 = get2DScan();
+       [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanForObstacles(scandata2);
+       
+       disp(isItBlocked)
+   end  
+  
+   end  
+   
 %% Run Test function
 disp("Test function")
+currentpos=[0,0];
+Orientation=0;
 resetODOM();
 PlotWayPoints(OrgWP)
 for n = 1 : length(WayPoints)
-    [currentPos, Orientation,isAtEnd]=MoveP2P(robot1, currentPos, Orientation, controller, WayPoints(n),OrgWP,0.1);
+    [currentPos, Orientation,isAtEnd]=MoveP2P(robot1, currentPos, Orientation, controller, WayPoints(n),OrgWP,0.5);
     if(isAtEnd==0)
         disp("object detected!!!")
+        assert(false);
     end
 end
 
@@ -169,7 +174,7 @@ function scandata2 = get2DScan()
 
     scanlive = rossubscriber("/scan");
     scandata2 = receive(scanlive,10);
-    disp("Scan OK")
+    %disp("Scan OK")
 
 end 
 
@@ -187,27 +192,29 @@ function bool = Drive(X,Omega)
 end
 
 function [deltaPos] = bugaroundRight()
-checktime = 0.05;
-deltaTime = 0.05; 
-startPos = getCurrentPos();
-isClear=0
-turnedcorners=0
+checktime = 0.3;
+deltaTime = 0.3; 
+curPos = getCurrentPos()
+isClear=0;
+turnedcorners=0;
 range=0;
 range1=10;
 impossible=0;
 
-vizRate = rateControl(1/checktime);
+vizRate = rateControl(checktime);
     
     %start process of driving around the obstacle on right side, then
     %switch to left side if failed 
     deltaTime=0.00;
     % 90 degress = 1.5705 rads
     angularRate = -0,5;
+    targetAngle = curPos(3)-1.5705;
     
     %driving right
-    while((deltaTime*angularRate)<1.5705)
+    while(curPos(3) < targetAngle)
         Drive(1,angularRate);
         deltaTime=deltaTime+checktime;
+        curPos = getCurrentPos()
         waitfor(vizRate);
     end
     
@@ -281,23 +288,30 @@ function [range, angle] = getAngleRange(scan,rads)
     %disp("count: ")
     %disp(cnt)    
     
-    assert(lastVisit ~= -1)
+    if((lastVisit == -1))
+        range = -1;
+        angle = 0;
+        
+        
     
-    xslice = x((lastVisit-cnt):lastVisit)
-    dslice = d((lastVisit-cnt):lastVisit)
+    else
+    xslice = x((lastVisit-cnt):lastVisit);
+    dslice = d((lastVisit-cnt):lastVisit);
     
     %disp(lastVisit-cnt-10)
     
     mdl = fitlm(xslice,dslice);
     coef=mdl.Coefficients.Estimate;
     
-    xP = [(rads-0.2),(rads+0.2)]
+    xP = [(rads-0.2),(rads+0.2)];
     
-    %plot(xP, coef(1) + coef(2)*xP, 'r')
+   % plot(xP, coef(1) + coef(2)*xP, 'r')
         
-    range = coef(2)*rads + coef(1)
-    angle = rad2deg(atan(coef(2)))
-    
+    range = coef(2)*rads + coef(1);
+    angle = rad2deg(atan(coef(2)));
+    end
+
+
 end
 
 function bool = MakeKTurnRight()
@@ -355,7 +369,7 @@ vizRate = rateControl(1/SampleTime);
 
 % Initialize the figure
 %figure
-
+startTime=vizRate.TotalElapsedTime;
  
 while( distanceToGoal > goalRadius )
     
@@ -371,17 +385,21 @@ while( distanceToGoal > goalRadius )
     %calculate the new robot position.
     robotCurrentPose = [initialPos initOrientation] + getCurrentPos(); 
     
+    currentTime = vizRate.TotalElapsedTime;
     %interrupt settings
-    scandata2 = get2DScan();
-    [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanforObstacles(scandata2)
+    if((currentTime - startTime)>4)
+        startTime=startTime + 4;
+        scandata2 = get2DScan();
+        [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanForObstacles(scandata2);
     
-    if(isItBlocked==1)
-        disp("Interrupt Statement triggered") 
-        isAtEnd=0;
-
-        
-        return;
-    end 
+        if(isItBlocked==1)
+            disp("Interrupt Statement triggered")
+            endPos = robotCurrentPose(1:2);
+            Orientation = robotCurrentPose(3);
+            isAtEnd=0;
+            return;
+        end 
+    end
     
     % Re-compute the distance to the goal
     distanceToGoal = norm(robotCurrentPose(1,1:2) - robotGoal(:));

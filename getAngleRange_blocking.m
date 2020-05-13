@@ -34,7 +34,7 @@ function [range, angle] = getAngleRange_blocking(scan,rads)
     %disp(cnt)    
     
     if((lastVisit == -1))
-        range = 0;
+        range = -1;
         angle = 0;
         
         

@@ -1,3 +1,4 @@
+
 function [range, angle] = getAngleRange(scan,rads)
 
     
@@ -32,21 +33,28 @@ function [range, angle] = getAngleRange(scan,rads)
     %disp("count: ")
     %disp(cnt)    
     
-    assert(lastVisit ~= -1)
+    if((lastVisit == -1))
+        range = -1;
+        angle = 0;
+        
+        
     
-    xslice = x((lastVisit-cnt):lastVisit)
-    dslice = d((lastVisit-cnt):lastVisit)
+    else
+    xslice = x((lastVisit-cnt):lastVisit);
+    dslice = d((lastVisit-cnt):lastVisit);
     
     %disp(lastVisit-cnt-10)
     
     mdl = fitlm(xslice,dslice);
     coef=mdl.Coefficients.Estimate;
     
-    xP = [(rads-0.2),(rads+0.2)]
+    xP = [(rads-0.2),(rads+0.2)];
     
-    %plot(xP, coef(1) + coef(2)*xP, 'r')
+   % plot(xP, coef(1) + coef(2)*xP, 'r')
         
-    range = coef(2)*rads + coef(1)
-    angle = rad2deg(atan(coef(2)))
-    
+    range = coef(2)*rads + coef(1);
+    angle = rad2deg(atan(coef(2)));
+    end
+
+
 end
