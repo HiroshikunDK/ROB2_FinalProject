@@ -66,7 +66,7 @@ while( distanceToGoal > goalRadius )
     %calculate the new robot position.
     robotCurrentPose = robotCurrentPose + (vel*SampleTime)'; 
     
-    if(scanForObstacles()==1)
+    if(0==1)
         disp("Interrupt Statement triggered") 
         
         endPos=robotCurrentPose(1,[1 2]);

@@ -23,12 +23,12 @@ i_counter = 0;
 fail_R = 0;
 fail_L = 0;
 
-disp("Range left: ")
+%disp("Range left: ")
 
 for(rad=0.55:-0.1:0)
     [range, angle]=getAngleRange(scandata,rad);
     i_counter = i_counter+1;
-    disp(range)
+    %disp(range)
     if((range < maxDistVar) && (range > 0))
         fail_R = 1;
         range_holder_R(i_counter) = range;
@@ -37,11 +37,11 @@ for(rad=0.55:-0.1:0)
 end
 
 i_counter = 0; %last half of maxdistance_per_point
-disp("Range right") 
+%disp("Range right") 
 for(rad=-0.55:+0.1:0)
     [range, angle]=getAngleRange(scandata,rad);
     i_counter = i_counter+1;
-    disp(range)
+    %disp(range)
    if((range < maxDistVar) && (range > 0))
         fail_R = 1;
         range_holder_L(i_counter) = range;

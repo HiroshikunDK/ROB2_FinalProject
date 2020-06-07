@@ -1,0 +1,69 @@
+%% This function doesn't work because of drifting turtlebot 
+function [deltaPos] = bugaroundRight()
+curPos = getCurrentPos()
+isBlocked=1;
+turnedcorners=0;
+impossible=0;
+
+vizRate = rateControl(1/20);
+
+    sd = get2DScan();
+    [range, angle]=getAngleRange(sd,0);
+    value = (-3.14159/2)-deg2rad(angle)
+    Twist(value);
+    disp(getCurrentPos())
+    
+    while((turnedcorners ~= 2)&&(turnedcorners ~= -2)) 
+    if(impossible==0)    
+    while(isBlocked==1)
+        %Check if something is blocking the way
+        sd = get2DScan();
+        [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanForObstacles(sd);
+        if(isItBlocked==1)
+            %if path is blocked activate the bugaround on other side
+            impossible=1;
+        else
+            %if nothing is blocking the way 
+            %
+            move(1.0, 0.02);
+            pause(1);
+            Twist(3.14159/2);
+            %disp(getCurrentPos())
+            sd = get2DScan();
+            [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanForObstacles(sd);
+            isBlocked=isItBlocked; 
+            if (isBlocked == 1)
+                Twist(-3.14159/2);
+            else
+                turnedcorners=turnedcorners+1
+            end
+            
+            waitfor(vizRate);
+        end
+    end
+        move(1.0, 0.02);
+        isBlocked=1;
+    
+    else
+        %turn around and start bug around other way
+        Twist(3.14159/2);
+        %Twist(3.14159/2);
+        isBlocked=1;  
+        while(isBlocked==1)
+            move(1.0, 0.02);
+            pause(1);
+            Twist(-3.14159/2);
+            %disp(getCurrentPos())
+            sd = get2DScan();
+            [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanForObstacles(sd);
+            isBlocked=isItBlocked;
+            if (isBlocked == 1)
+                Twist(3.14159/2);
+            else
+                turnedcorners=turnedcorners-1;
+            end
+            waitfor(vizRate);
+        end
+    end
+    end
+end
