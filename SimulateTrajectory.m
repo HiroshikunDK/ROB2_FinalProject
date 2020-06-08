@@ -2,9 +2,9 @@
 
 setenv('ROS_MASTER_URI','http://192.168.128.129:11311')
 
-setenv('ROS_IP','192.168.1.210')
+setenv('ROS_IP','192.168.100.105')
 
-rosinit('http://192.168.128.129:11311','NodeHost','192.168.1.210');
+rosinit('http://192.168.128.129:11311','NodeHost','192.168.100.105');
 
 %% Setup Kobuki Enviorment - HomeStation: 
 setenv('ROS_MASTER_URI','http://192.168.1.164:11311')
@@ -74,12 +74,15 @@ imwrite(t,'C:\Users\thoma\Documents\AU_IKT\_ROB2\Final_project\test.jpg')
     velpub = rospublisher("/mobile_base/commands/velocity");
     velmsg = rosmessage(velpub)
 
-    velmsg.Linear.X = 1.0;
-    velmsg.Linear.Y = 0.0;
-    velmsg.Linear.Z = 0.0;
-    velmsg.Angular.X = 0.0;
-    velmsg.Angular.Y = 0.0;
-    velmsg.Angular.Z = 0.0;
+    velmsg.Linear.X = 1;
+    velmsg.Linear.Y = 0;
+    velmsg.Linear.Z = 0;
+    velmsg.Angular.X = 0;
+    velmsg.Angular.Y = 0;
+    velmsg.Angular.Z = 0;
+    
+    pause(1)
+    
     send(velpub,velmsg);
    
    
@@ -96,8 +99,13 @@ imwrite(t,'C:\Users\thoma\Documents\AU_IKT\_ROB2\Final_project\test.jpg')
 %disp("isItBlocked:")
 %disp(isItBlocked)   
 
+globalpos=[0,0,0];
 
- 
+sdtest=get2DScan();
+deltaPos1 = move2obj(globalpos,0.7,sdtest)
+newcontroller = createController([deltaPos1(1:2)],0.15,0.5,0.25);
+[globalpos,isAtEnd]=MoveP2P(robot1, globalpos, newcontroller, deltaPos1(1:2),0.1);
+disp("Done")
 
    %% Test obstacle
    
@@ -166,16 +174,16 @@ end
 %% test image analysis
 
 %reset all robot info
-resetODOM();
-currentPos = [0.0 0.0];
-Orientation = 0;
+globalPos = [0, 0, -1];
 
-bugaround(robot1, controllerCrawl, OrgWP, 0.1, currentPos, Orientation)
-disp("Bugaround ended!!!!")
+deltaPos = calcBugAroundPos(globalPos,-90, 0.7);
+
+%globalPos = bugaround(robot1, 0.1, globalPos)
+%disp("Bugaround ended!!!!")
 %Twist(3.141/2);
 
 %% Model Trajectory functions
-function bugaround(RobObj, ControllerObj, OrgWP, SampleTime , initPos, initOri)
+function newPose = bugaround(RobObj, SampleTime , initPos)
     %scan obstacle
 
     disp("Move along citizen ")
@@ -183,12 +191,14 @@ function bugaround(RobObj, ControllerObj, OrgWP, SampleTime , initPos, initOri)
     [range, angle] = getAngleRange(sd,0);
     disp([range, angle])
     
-    deltaPos = calcBugAroundPos(-90+angle, range);
+    deltaPos = calcBugAroundPos(initPos,-90+angle, 0.7);
+    currentPose=initPos;
     Twist(-3.14159/2); 
-    pos= getCurrentPos();
+    
     disp("CurrentPost:")
-    disp(pos)
-    [currentPos, Orientation,isAtEnd]=MoveP2P(RobObj, pos(1:2), 0, ControllerObj, deltaPos(1:2),OrgWP,SampleTime);
+    disp(deltaPos)
+    tempControl = createController([deltaPos(1:2)],0.15,0.5,0.25);
+    [currentPose, isAtEnd]=MoveP2P(RobObj, currentPose, tempControl, deltaPos(1:2),SampleTime);
     
     %reset the variable
     isAtEnd=1;
@@ -202,14 +212,13 @@ function bugaround(RobObj, ControllerObj, OrgWP, SampleTime , initPos, initOri)
         
         while((isBlocked==1)&&(isAtEnd==1))
             %turn left and scan for object, will place itself along the object.
-            pos= getCurrentPos();
-            isBlocked = twistCheck(pos(3), 3.14159/2, 1.5);
+            [currentPose, isblocked] = twistCheck(pos(3), 3.14159/2, 1.5);
             disp("Postion angle checked")
             disp(pos)
             %move forward along the along the object
-            pos= getCurrentPos();
             deltaPos = calcBugAroundPos(0, 1); %drive forward 
-            [currentPos, Orientation,isAtEnd]=MoveP2P(RobObj, pos(1:2), pos(3), ControllerObj, deltaPos(1:2),OrgWP,SampleTime);
+            tempControl = createController([deltaPos(1:2)],0.15,0.5,0.25);
+            [currentPos, Orientation,isAtEnd]=MoveP2P(RobObj, currentPose, tempControl, deltaPos(1:2),SampleTime);
             if(isBlocked==0)
                 disp("Corner Turned")
                 turnedCorners=turnedCorners+1
@@ -221,20 +230,21 @@ function bugaround(RobObj, ControllerObj, OrgWP, SampleTime , initPos, initOri)
 end
 
 %end position should be decided.
-function newPos = calcBugAroundPos(angle, range)
+function newPos = calcBugAroundPos(initPos, angle, range)
     
-    newPos = getCurrentPos();
+    newPos = initPos;
     disp("StartPostion:")
     disp(newPos)
-    newPos(1) = newPos(1)+cosd(angle)*range; %x coordinate
-    newPos(2) = newPos(2)+sind(angle)*range; %y coordinate 
+    newPos(1) = newPos(1)+(cosd(angle))*range; %x coordinate
+    newPos(2) = newPos(2)+(sind(angle))*range; %y coordinate 
     disp("targetPostion:")
     disp(newPos)
 
 end
 
-function isblocked = twistCheck(startAngle, checkAngleDelta, rangeLimit)
-    Twist(startAngle+checkAngleDelta);
+function [newPose, isblocked] = twistCheck(oriPos, checkAngleDelta, rangeLimit)
+    startPose = getCurrentPos();
+    Twist(oriPos(3)+checkAngleDelta);
     sd = get2DScan();
     [range, angle] = getAngleRange(sd,0.25);
     disp("Twist Test Range:")
@@ -249,9 +259,13 @@ function isblocked = twistCheck(startAngle, checkAngleDelta, rangeLimit)
     disp(range)
     if (range<rangeLimit)
         Twist(-checkAngleDelta);
+        endPose = getCurrentPos();
+        newPose = oriPos + (endPose-startPose);
         isblocked=1;
         return
     end
+    endPose = getCurrentPos();
+    newPose = oriPos + (endPose-startPose);
     isblocked = 0;    
 end
 
@@ -354,15 +368,15 @@ function bool = MakeKTurnRight()
     end
 end
 
-function [endPos, Orientation, isAtEnd] = MoveP2P(RobObj, initialPos, initOrientation, ControllerObj, EndPoint, WayPoints, SampleTime)
+function [newPose, isAtEnd] = MoveP2P(RobObj, initialPos, ControllerObj, EndPoint, SampleTime)
 
 %robot intialisation.
 %robotInitialLocation = initialPos; %get from robot
 robotGoal = EndPoint;
-robotCurrentPose = [initialPos initOrientation];
+robotCurrentPose = initialPos;
+startOdomPose = getCurrentPos();
 
-
-distanceToGoal = norm(initialPos - robotGoal);
+distanceToGoal = norm(initialPos(1:2) - robotGoal);
 
 goalRadius = 0.2;
 
@@ -375,20 +389,20 @@ startTime=vizRate.TotalElapsedTime;
  
 while( distanceToGoal > goalRadius )
     
+    %robotCurrentPose = robotCurrentPose - startOdomPose;
     % Compute the controller outputs, i.e., the inputs to the robot
     [i, omega] = ControllerObj(robotCurrentPose(1,:));
     release(ControllerObj)
     
     % Get the robot's velocity using controller inputs
     vel = derivative(RobObj, robotCurrentPose(1,:), [i, omega]);
-    
     move(ControllerObj.DesiredLinearVelocity, vel(3,1));
     
     %calculate the new robot position.
-    robotCurrentPose = getCurrentPos(); 
-    disp(robotCurrentPose)
-    
+    tempPose = getCurrentPos()-startOdomPose;
+    robotCurrentPose = tempPose + initialPos;    
     currentTime = vizRate.TotalElapsedTime;
+
     %interrupt settings
     if((currentTime - startTime)>4)
         startTime=startTime + 4;
@@ -397,39 +411,19 @@ while( distanceToGoal > goalRadius )
     
         if(isItBlocked==1)
             disp("Interrupt Statement triggered")
-            endPos = robotCurrentPose(1:2);
-            Orientation = robotCurrentPose(3);
+            newPose = robotCurrentPose;
             isAtEnd=0;
+            
             return;
         end 
     end
     
-    % Re-compute the distance to the goal
-    distanceToGoal = norm(robotCurrentPose(1,1:2) - robotGoal(:));
-      
-    % Plot the path of the robot as a set of transforms
-    %hold off
-    
-    % Plot path each instance so that it stays persistent while robot mesh
-    % moves
-    %plot(WayPoints(:,1), WayPoints(:,2),"k--d")
-    %xlim(PlotLimit2D)
-    %ylim(PlotLimit2D)
-    %hold all
-    
-    %draw the new robot postion and orientation.
-    %plotTrVec = [robotCurrentPose(1:2) 0];
-    %plotRot = axang2quat([0 0 1 robotCurrentPose(3)]);
-    %plotTransforms(plotTrVec, plotRot, "MeshFilePath", "groundvehicle.stl", "Parent", gca, "View","2D", "FrameSize", frameSize);
-    %light;
-    
     waitfor(vizRate);
-end
-    
-    endPos = robotCurrentPose(1:2);
-    Orientation = robotCurrentPose(3);
+end    
+    newPose = robotCurrentPose;
     isAtEnd =1;    
 end
+
 
 function bool = PlotWayPoints(WayPoints)
     plot(WayPoints(:,1), WayPoints(:,2),"k--d")
@@ -516,8 +510,14 @@ function move(X,Omega)
 
 end
 
-function move2obj(angle)
-    deltaPos = calcBugAroundPos(angle, 0.5);
+function targetPos = move2obj(orgPose,angle1, scandata)
+    [range, angle] = getAngleRange(scandata,angle1);
+    if(range ~= -1)
+        targetPos = calcBugAroundPos(orgPose,angle1, range - 0.8);
+    else 
+        targetPos = orgPose;
+        disp("Error - Invaild Distance")
+    end
 end
 
 function controller = createController(WayPoints,DLV,MAV, LAD) 

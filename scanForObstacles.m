@@ -62,7 +62,7 @@ Right_angle = 0;
 Left_range = 0;
 Left_angle = 0;
 end
-disp(isItBlocked)
+%disp(isItBlocked)
 %should return the approx length of the object, so we know where to go past
 %it 
 %width = 0;
