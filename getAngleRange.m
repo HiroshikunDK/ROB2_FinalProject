@@ -1,4 +1,3 @@
-
 function [range, angle] = getAngleRange(scan,rads)
 
     
@@ -40,8 +39,8 @@ function [range, angle] = getAngleRange(scan,rads)
         
     
     else
-    xslice = x((lastVisit-cnt+1):lastVisit);
-    dslice = d((lastVisit-cnt+1):lastVisit);
+    xslice = x((lastVisit-cnt):lastVisit);
+    dslice = d((lastVisit-cnt):lastVisit);
     
     %disp(lastVisit-cnt-10)
     
