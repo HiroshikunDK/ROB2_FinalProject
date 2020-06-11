@@ -6,15 +6,13 @@ robotGoal = EndPoint;
 robotCurrentPose = initialPos;
 startOdomPose = getCurrentPos();
 
+%calculate the distance to goal, in case we already are there 
 distanceToGoal = norm(initialPos(1:2) - robotGoal);
-
 goalRadius = 0.2;
 
 % Initialize the simulation loop
 vizRate = rateControl(1/SampleTime);
 
-% Initialize the figure
-%figure
 startTime=vizRate.TotalElapsedTime;
  
 while( distanceToGoal > goalRadius )
@@ -24,18 +22,22 @@ while( distanceToGoal > goalRadius )
     [i, omega] = ControllerObj(robotCurrentPose(1,:));
     release(ControllerObj)
     
-    % Get the robot's velocity using controller inputs
+    % Get the robot's(turtlebot) velocity using controller inputs
     vel = derivative(RobObj, robotCurrentPose(1,:), [i, omega]);
     move(ControllerObj.DesiredLinearVelocity, vel(3,1));
     
     %calculate the new robot position.
+    %difference i odom value
     tempPose = getCurrentPos()-startOdomPose;
+    %take the delta odom value and add to inital position is the current
+    %global position
     robotCurrentPose = tempPose + initialPos;    
+    
     currentTime = vizRate.TotalElapsedTime;
-
-    %interrupt settings
+    %interrupt settings every 4th second
     if((currentTime - startTime)>4)
         startTime=startTime + 4;
+        %get scan and look for object obstructing the robot
         scandata2 = get2DScan();
         [Right_angle,Right_range,Left_angle,Left_range,isItBlocked] = scanForObstacles(scandata2);
     
@@ -49,7 +51,8 @@ while( distanceToGoal > goalRadius )
     end
     
     waitfor(vizRate);
-end    
+end 
+    %should waypoint be reached, save the calculated global postion 
     newPose = robotCurrentPose;
     isAtEnd =1;    
 end

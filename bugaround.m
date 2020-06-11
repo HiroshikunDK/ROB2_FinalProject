@@ -27,19 +27,20 @@ function newPose = bugaround(RobObj, SampleTime , initPos)
         
         while((isBlocked==1)&&(isAtEnd==1))
             %turn left and scan for object, will place itself along the object.
-            [currentPose, isblocked] = twistCheck(pos(3), 3.14159/2, 1.5);
+            [currentPose, isblocked] = twistCheck(currentPose, 3.14159/2, 1.5);
             disp("Postion angle checked")
-            disp(pos)
+            disp(currentPose)
             %move forward along the along the object
-            deltaPos = calcBugAroundPos(0, 1); %drive forward 
+            deltaPos = calcBugAroundPos(currentPose,0,1); %drive forward 
             tempControl = createController([deltaPos(1:2)],0.15,0.5,0.25);
-            [currentPos, Orientation,isAtEnd]=MoveP2P(RobObj, currentPose, tempControl, deltaPos(1:2),SampleTime);
+            [currentPose,isAtEnd]=MoveP2P(RobObj, currentPose, tempControl, deltaPos(1:2),SampleTime);
+            twist
             if(isBlocked==0)
                 disp("Corner Turned")
                 turnedCorners=turnedCorners+1
             end
             
         end 
-    end 
-  
+    end
+    newPose = currentPose;
 end

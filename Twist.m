@@ -1,25 +1,46 @@
 function Twist(radian)
     startPos = getCurrentPos()
-    if(startPos(3)+radian>3.14159)
-        endOri=(startPos(3)+radian)-(3.14159*2);     
-    elseif(startPos(3)+radian<-3.14159)
-        endOri=(startPos(3)+radian)+(3.14159*2);
+    radOri=startPos(3)+radian;
+    if(radOri<-3.14159)
+        rmd=mod(radOri,-3.14159);
+        endOri=rmd+3.14159;     
+    elseif(radOri>3.14159)
+        rmd=mod(radOri,3.14159);
+        endOri=rmd-3.14159;
     else
-        endOri=startPos(3)+radian;
-    end
         
+    end
+    delta=1;    
     curOri = startPos(3)
-    while((((endOri-curOri)<0.01)&&((endOri-curOri)>-0.01))==0)
-        delta = endOri-curOri;
-
-        velpub = rospublisher("/mobile_base/commands/velocity");
-        velmsg = rosmessage(velpub);
-        if(delta<0.1)
-            velmsg.Angular.Z = delta;
+    while(((delta<0.01)&&(delta>-0.01))==0)
+        
+        %calculate turning distance turning left(positive radian value)
+        if(curOri>endOri)
+            tempLeft=(3.14159+endOri)+(3.14159-curOri);    
         else
-            velmsg.Angular.Z = delta;
+            tempLeft= endOri-curOri;
         end
+        
+        %calculate turning distance turning right(negative radian value)
+        if(curOri<endOri)
+            tempRight=-(3.14159-endOri)-(3.14159-curOri);    
+        else
+            tempRight= curOri-endOri;
+        end
+        
+        %this find the shortest way to turn towards target
+        if((tempRight*-1)<tempLeft)
+            delta = tempRight;
+        else
+            delta = tempLeft;
+        end
+        
+        %sends the twist message 
+        velpub = rospublisher("/mobile_base/commands/velocity");
+        velmsg = rosmessage(velpub); 
+        velmsg.Angular.Z = delta;
         send(velpub,velmsg);
+        
         startPos = getCurrentPos();
         curOri = startPos(3);
     end
